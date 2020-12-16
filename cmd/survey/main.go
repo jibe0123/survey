@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/gin-gonic/gin"
 	v1 "github.com/jibe0123/survey/cmd/v1"
+	"github.com/jibe0123/survey/pkg/database"
 	"log"
 	"net/http"
 	"os"
@@ -14,8 +15,11 @@ import (
 
 func main() {
 	gin.ForceConsoleColor()
-	//err := database.Connect()
 	router := gin.Default()
+
+	if err := database.Connect(); err != nil {
+		log.Panic(err)
+	}
 
 	v1.ApplyRoutes(router)
 
