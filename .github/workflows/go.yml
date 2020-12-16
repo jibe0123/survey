@@ -37,6 +37,3 @@ jobs:
 
     - name: Build
       run: go build -v ./cmd/survey
-
-    - name: Test
-      run: go test -v .
