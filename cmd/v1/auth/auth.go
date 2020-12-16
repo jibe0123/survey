@@ -19,8 +19,6 @@ func ApplyRoutes(r *gin.RouterGroup) {
 
 	authRouter := r.Group("/auth")
 	{
-		authRouter.GET("/operator/hello", Operator(auth), SayHello)
-		authRouter.GET("/admin/hello", Admin(auth), SayHello)
-		authRouter.GET("/system_admin/hello", SystemAdmin(auth), SayHello)
+		authRouter.POST("/register", Admin(auth), Register)
 	}
 }

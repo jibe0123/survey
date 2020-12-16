@@ -2,46 +2,25 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/jibe0123/survey/pkg/database"
 	jwt "github.com/kyfk/gin-jwt"
+	"golang.org/x/crypto/bcrypt"
 	"net/http"
 )
 
-type Role int
+type User = database.User
+type Role = database.Role
 
-const (
-	OPERATOR     Role = 0x1
-	ADMIN        Role = 0x1 << 1
-	SYSTEM_ADMIN Role = 0x1 << 2
-)
-
-func (r Role) IsOperator() bool {
-	return r&OPERATOR != 0
-}
-
-func (r Role) IsAdmin() bool {
-	return r&ADMIN != 0
-}
-
-func (r Role) IsSystemAdmin() bool {
-	return r&SYSTEM_ADMIN != 0
-}
-
-var naiveDatastore = map[string]User{
-	"operator":     {"operator", "o@o.com", "operator", OPERATOR},
-	"admin":        {"admin", "a@a.com", "admin", OPERATOR | ADMIN},
-	"system_admin": {"system_admin", "sa@sa.com", "system_admin", SYSTEM_ADMIN},
-}
-
-type User struct {
+type requestRegister struct {
 	Username string `json:"username"`
+	Password string `json:"password"`
 	Email    string `json:"email"`
-	Password string `json:"-"` // here is just for example
-	Role     Role   `json:"-"`
 }
 
+// NewAuth Create new auth context
 func NewAuth() (jwt.Auth, error) {
 	return jwt.New(jwt.Auth{
-		SecretKey: []byte("must change here"),
+		SecretKey: []byte("S3CR3TK3Y733T"),
 		Authenticator: func(c *gin.Context) (jwt.MapClaims, error) {
 			var req struct {
 				Username string `json:"username"`
@@ -51,8 +30,12 @@ func NewAuth() (jwt.Auth, error) {
 				return nil, jwt.ErrorAuthenticationFailed
 			}
 
-			u := naiveDatastore[req.Username] // change here fetching from read datastore
-			if u.Password != req.Password {
+			u, err := database.GetUserFromUsername(req.Username)
+			if err != nil {
+				return nil, jwt.ErrorUserNotFound
+			}
+
+			if err := bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password)); err != nil {
 				return nil, jwt.ErrorAuthenticationFailed
 			}
 
@@ -66,8 +49,8 @@ func NewAuth() (jwt.Auth, error) {
 			if !ok {
 				return nil, nil
 			}
-			u, ok := naiveDatastore[username]
-			if !ok {
+			u, err := database.GetUserFromUsername(username)
+			if err != nil {
 				return nil, nil
 			}
 			return u, nil
@@ -75,45 +58,49 @@ func NewAuth() (jwt.Auth, error) {
 	})
 }
 
+// Operator is user is admin
 func Operator(m jwt.Auth) gin.HandlerFunc {
 	return m.VerifyPerm(func(claims jwt.MapClaims) bool {
 		return role(claims).IsOperator()
 	})
 }
 
+// Admin is user is admin
 func Admin(m jwt.Auth) gin.HandlerFunc {
 	return m.VerifyPerm(func(claims jwt.MapClaims) bool {
 		return role(claims).IsAdmin()
 	})
 }
 
+// SystemAdmin is user is system admin
 func SystemAdmin(m jwt.Auth) gin.HandlerFunc {
 	return m.VerifyPerm(func(claims jwt.MapClaims) bool {
 		return role(claims).IsSystemAdmin()
 	})
 }
 
+// role get the role of the user
 func role(claims jwt.MapClaims) Role {
 	return Role(claims["role"].(float64))
 }
 
-func SayHello(c *gin.Context) {
-	u := jwt.User(c).(User)
-	c.JSON(http.StatusOK, struct {
-		User User `json:"user"`
-	}{u})
-}
-
 // Register routes for creating account
 func Register(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "Account_created",
-	})
-}
+	var req database.RequestRegister
 
-// Login routes for creating account
-func Login(c *gin.Context) {
-	c.JSON(200, gin.H{
-		"message": "Logged",
+	if err := c.BindJSON(&req); err != nil {
+		c.JSON(http.StatusInternalServerError, err)
+		return
+	}
+
+	err := database.CreateAccount(req)
+
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, err)
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"message": "Account_created",
 	})
 }
