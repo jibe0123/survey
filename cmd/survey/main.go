@@ -3,8 +3,11 @@ package main
 import (
 	"context"
 	"github.com/gin-gonic/gin"
+	_ "github.com/jibe0123/survey/api"
 	v1 "github.com/jibe0123/survey/cmd/v1"
 	"github.com/jibe0123/survey/pkg/database"
+	"github.com/swaggo/files"
+	"github.com/swaggo/gin-swagger"
 	"log"
 	"net/http"
 	"os"
@@ -13,6 +16,26 @@ import (
 	"time"
 )
 
+// @title Survey documentation API
+// @version 1.0
+// @description This is an api for creating a survey
+
+// @contact.name Agostin Jean-baptiste
+// @contact.email Jbagostin@gmail.com
+
+// @license.name MIT
+
+// @host localhost:8080
+// @BasePath /api/v1
+// @query.collection.format multi
+
+// @securityDefinitions.basic BasicAuth
+
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+
+// @x-extension-openapi {"example": "value on a json format"}
 func main() {
 	gin.ForceConsoleColor()
 	router := gin.Default()
@@ -20,6 +43,9 @@ func main() {
 	if err := database.Connect(); err != nil {
 		log.Panic(err)
 	}
+
+	url := ginSwagger.URL("http://localhost:8080/swagger/doc.json") // The url pointing to API definition
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler, url))
 
 	v1.ApplyRoutes(router)
 
